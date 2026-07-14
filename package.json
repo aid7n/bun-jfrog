@@ -16,7 +16,14 @@
     "typecheck": "tsc --noEmit",
     "start": "./dist/yarn",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun ./build.ts"
+    "build": "bun ./build.ts",
+    "build:all": "bun ./build.ts bun-windows-x64 && bun ./build.ts bun-windows-arm64 && bun ./build.ts bun-darwin-x64 && bun ./build.ts bun-darwin-arm64 && bun ./build.ts bun-linux-x64 && bun ./build.ts bun-linux-arm64",
+    "build:win-x64": "bun ./build.ts bun-windows-x64",
+    "build:win-arm64": "bun ./build.ts bun-windows-arm64",
+    "build:mac-x64": "bun ./build.ts bun-darwin-x64",
+    "build:mac-arm64": "bun ./build.ts bun-darwin-arm64",
+    "build:linux-x64": "bun ./build.ts bun-linux-x64",
+    "build:linux-arm64": "bun ./build.ts bun-linux-arm64"
   },
   "dependencies": {
     "semver": "^7"
