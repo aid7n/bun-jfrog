@@ -41,5 +41,4 @@ jobs:
         name: Create release PR
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d
         with:
-          version-script: bun changeset version
-          pr-title: "chore(release): version bump"
+          title: "chore(release): version bump"
