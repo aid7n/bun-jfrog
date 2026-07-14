@@ -10,6 +10,8 @@ export class BunJfrog {
   constructor() {}
 
   private log(message: string): void {
+    const v = Bun.env.BUN_JF_LOGS_ENABLED || "true";
+    if (v !== "true") return;
     const prefix = `[bun-jfrog] ${new Date().toISOString()} - `;
     const rootDir = path.resolve(process.cwd());
     const rootPkgLockPath = path.resolve(rootDir, "bun-jfrog.log");
@@ -27,7 +29,8 @@ export class BunJfrog {
   }
 
   public invokeVersionCmd(): void {
-    this.stdout.write("3.0.0");
+    const v = Bun.env.BUN_JF_SIMULATE_VERSION || "3.0.0";
+    this.stdout.write(v);
     this.log("intercepted yarn version command successfully");
     process.exitCode = 0;
   }
