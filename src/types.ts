@@ -11,13 +11,6 @@ export type YarnInfoLine = {
   };
 };
 
-export interface PackageJson {
-  dependencies?: BunPkgsWithVersion;
-  devDependencies?: BunPkgsWithVersion;
-  peerDependencies?: BunPkgsWithVersion;
-  catalog?: BunPkgsWithVersion;
-}
-
 export type BunBins<
   Name extends string = string,
   Path extends string = string,
@@ -31,8 +24,6 @@ export type BunPkgsWithVersion<
 export type BunTrustedDependencies = string[];
 
 export type BunCatalog = BunPkgsWithVersion;
-
-export type BunCatalogs = Record<string, BunCatalog>;
 
 export type BunWorkspace<
   Name extends string = string,
@@ -76,8 +67,7 @@ export interface BunLock {
   lockfileVersion: number;
   configVersion: number;
   workspaces: Record<string, BunWorkspace>;
-  trustedDependencies?: BunTrustedDependencies;
-  catalog?: BunCatalog;
-  catalogs?: BunCatalogs;
-  packages?: BunPackages;
+  trustedDependencies: BunTrustedDependencies;
+  catalog: BunCatalog;
+  packages: BunPackages;
 }
