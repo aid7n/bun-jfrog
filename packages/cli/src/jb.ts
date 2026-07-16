@@ -198,7 +198,7 @@ async function enableJB(
   }
 }
 
-async function disableJB(src: "menu" | "arg"): Promise<void> {
+async function disableJB(init: InitResult, src: "menu" | "arg"): Promise<void> {
   const jbYarn = locateBin("yarn");
   const yarnBkp = locateBin("yarn-jb-bak");
   try {
@@ -212,7 +212,7 @@ async function disableJB(src: "menu" | "arg"): Promise<void> {
       return;
     }
 
-    removeBin(jbYarn);
+    if (jbYarn.includes(init.bunBinPath)) removeBin(jbYarn);
     const restorePath = yarnBkp.replace("-jb-bak", "");
     const renamed = renameBin(yarnBkp, restorePath);
     if (!renamed) {
@@ -224,7 +224,7 @@ async function disableJB(src: "menu" | "arg"): Promise<void> {
     }
     const _yarnBkp = locateBin("yarn-jb-bak");
     if (_yarnBkp) {
-      return disableJB(src);
+      return disableJB(init, src);
     }
 
     stdout.write(`✅ restored ${yarnBkp} to ${restorePath}\n`);
@@ -275,7 +275,7 @@ async function handleSelection(
         return;
       }
       stdout.write("Disabling JFrog Bun compatibility...\n\n");
-      await disableJB(src);
+      await disableJB(init, src);
       break;
     default:
       stdout.write(`Invalid selection: ${selection}. Exiting.\n\n`);
