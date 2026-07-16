@@ -16,11 +16,22 @@
       "name": "@7x/jb",
       "version": "0.0.0",
       "bin": {
-        "jb": "./bin/jb",
+        "jb": "./bin/jb.js",
+      },
+      "dependencies": {
+        "@7x/jb-core": "workspace:*",
+        "@inquirer/prompts": "catalog:",
       },
       "devDependencies": {
         "@7x/jb-config": "workspace:*",
+        "@eslint/js": "catalog:",
+        "@types/bun": "catalog:",
+        "eslint": "catalog:",
+        "eslint-config-prettier": "catalog:",
+        "eslint-plugin-only-warn": "catalog:",
         "prettier": "catalog:",
+        "typescript": "catalog:",
+        "typescript-eslint": "catalog:",
       },
       "optionalDependencies": {
         "@7x/jb-darwin-arm64": "workspace:*",
@@ -73,7 +84,7 @@
       "name": "@7x/jb-darwin-arm64",
       "version": "0.0.0",
       "bin": {
-        "yarn": "./bin/yarn",
+        "jb-yarn": "./bin/jb-yarn",
       },
       "devDependencies": {
         "prettier": "catalog:",
@@ -83,7 +94,7 @@
       "name": "@7x/jb-darwin-x64",
       "version": "0.0.0",
       "bin": {
-        "yarn": "./bin/yarn",
+        "jb-yarn": "./bin/jb-yarn",
       },
       "devDependencies": {
         "prettier": "catalog:",
@@ -93,7 +104,7 @@
       "name": "@7x/jb-linux-arm64",
       "version": "0.0.0",
       "bin": {
-        "yarn": "./bin/yarn",
+        "jb-yarn": "./bin/jb-yarn",
       },
       "devDependencies": {
         "prettier": "catalog:",
@@ -103,7 +114,7 @@
       "name": "@7x/jb-linux-x64",
       "version": "0.0.0",
       "bin": {
-        "yarn": "./bin/yarn",
+        "jb-yarn": "./bin/jb-yarn",
       },
       "devDependencies": {
         "prettier": "catalog:",
@@ -113,7 +124,7 @@
       "name": "@7x/jb-win32-arm64",
       "version": "0.0.0",
       "bin": {
-        "yarn": "./bin/yarn",
+        "jb-yarn": "./bin/jb-yarn",
       },
       "devDependencies": {
         "prettier": "catalog:",
@@ -123,7 +134,7 @@
       "name": "@7x/jb-win32-x64",
       "version": "0.0.0",
       "bin": {
-        "yarn": "./bin/yarn",
+        "jb-yarn": "./bin/jb-yarn",
       },
       "devDependencies": {
         "prettier": "catalog:",

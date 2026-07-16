@@ -8,9 +8,28 @@
     "url": "https://github.com/aid7n/jb",
     "directory": "packages/cli"
   },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "dev": "bun run --watch src/jb.ts",
+    "build": "bun ./build.ts",
+    "start": "bun ./src/jb.ts"
+  },
+  "dependencies": {
+    "@7x/jb-core": "workspace:*",
+    "@inquirer/prompts": "catalog:"
+  },
   "devDependencies": {
     "prettier": "catalog:",
-    "@7x/jb-config": "workspace:*"
+    "@7x/jb-config": "workspace:*",
+    "@eslint/js": "catalog:",
+    "@types/bun": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-only-warn": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
   },
   "optionalDependencies": {
     "@7x/jb-darwin-arm64": "workspace:*",

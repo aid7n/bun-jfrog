@@ -5,6 +5,15 @@ import semver from "semver";
 import { JBParser } from "./parser";
 import type { PackageJson, YarnInfoLine } from "./types";
 
+export const targetMap = {
+  "jb-darwin-arm64": "bun-darwin-arm64",
+  "jb-darwin-x64": "bun-darwin-x64",
+  "jb-linux-arm64": "bun-linux-arm64",
+  "jb-linux-x64": "bun-linux-x64",
+  "jb-win32-arm64": "bun-windows-arm64",
+  "jb-win32-x64": "bun-windows-x64",
+} as const satisfies Record<string, Bun.Build.CompileTarget>;
+
 export class JB {
   private stdout = process.stdout;
 
