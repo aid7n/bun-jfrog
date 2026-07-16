@@ -136,13 +136,16 @@ async function enableJB(
 ): Promise<void> {
   const yarn = locateBin("yarn");
   if (yarn) {
-    const backupPath = isWindows
+    let backupPath = isWindows
       ? yarn
           .toLowerCase()
           .replace(".exe", "-jb-bak.exe")
           .replace(".ps1", "-jb-bak.ps1")
           .replace(".cmd", "-jb-bak.cmd")
       : yarn + "-jb-bak";
+    if (isWindows && backupPath.endsWith("yarn")) {
+      backupPath = backupPath + "-jb-bak";
+    }
     const renamed = renameBin(yarn, backupPath);
     if (!renamed) {
       stdout.write(
