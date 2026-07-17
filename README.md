@@ -24,6 +24,9 @@
     <img src="https://img.shields.io/github/actions/workflow/status/aid7n/jb/ci.yml?style=flat&label=CI&labelColor=%23303030&color=%231f1f1f" alt="CI">
   </a>
   <a href="https://npmjs.com/@7x/jb">
+    <img src="https://img.shields.io/npm/dw/@7x/jb?labelColor=%23303030&color=%231f1f1f" alt="NPM Weekly Downloads" />
+  </a>
+  <a href="https://npmjs.com/@7x/jb">
     <img src="https://img.shields.io/npm/v/@7x/jb?filter=%407x%2Fjb%40*&label=@7x/jb&labelColor=%23303030&color=%231f1f1f" alt="CLI Version" />
   </a>
   <a href="https://npmjs.com/@7x/jb-core">
@@ -81,7 +84,7 @@ As JB is intended to provide native Bun support to the JFrog CLI via the Yarn im
 
 To use via the JFrog CLI, you will also have to configure Yarn in your repository via `jf yarn-config` - see the [JFrog docs]("https://docs.jfrog.com/artifactory/docs/jf-yarn") on JFrog Yarn for more information on how to get set up. Though this will not be used nor is it required by JB, it is required by the JFrog CLI.
 
-> ⚠️ Without a valid Artifactory registry URL set at runtime, the JB Yarn executable will immediately error on load, causing any commands to exit with code 1. This is to prevent malicious usage of this implementation.
+> ⚠️ Without a valid Artifactory registry URL set at runtime, the JB Yarn executable will immediately error on load, causing any commands to exit with code 1. This is to prevent malicious usage of this implementation. This is, however, bypassed in development mode (`bun dev` in repo or `yarn --jbdev` at build time)
 
 Current support for Yarn commands via JB are as follows:
 
@@ -92,6 +95,7 @@ Current support for Yarn commands via JB are as follows:
 | `yarn config get <...>` | Returns `{}` - we have no need to adjust Bun's config                                                           |
 | `yarn config set <...>` | Outputs nothing - no output is required on a successful config set                                              |
 | `yarn --version`        | Outputs `3.0.0` by default, overridable by environment variable. JF CLI only requires this to satisfy `>2.4.0`. |
+| `yarn --jbdev`          | Opens development menu for `jb`.                                                                                |
 
 If there are needs for other commands, feel free to contribute via PR or raise a GitHub issue.
 
