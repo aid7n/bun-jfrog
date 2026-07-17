@@ -39,34 +39,43 @@ const visibleArgs = Object.entries(argHandlers).filter(
 );
 
 async function invokeCmd(cmd: string): Promise<void> {
-  const handler = argHandlers[cmd];
-  if (!handler || (handler.hidden && yarnArg !== DEV_PROMPT)) {
-    jb.ExitWithError(`unrecognized command: ${cmd}`, true);
-  } else {
-    await handler.handler();
+  try {
+    const handler = argHandlers[cmd];
+    if (!handler || (handler.hidden && yarnArg !== DEV_PROMPT)) {
+      throw new Error(`unrecognized command: ${cmd}`);
+    } else {
+      await handler.handler();
+    }
+  } catch (err) {
+    return jb.ExitWithError(`failed to invoke command "${cmd}": ${err}`);
   }
 }
 
 async function devPrompt(): Promise<void> {
-  const selection = await select({
-    message: "select a yarn command to intercept >",
-    choices: visibleArgs.map(([arg]) => arg),
-  });
-  await invokeCmd(selection);
-  process.stdout.write("\n\n");
-  devPrompt();
+  try {
+    const selection = await select({
+      message: "select a yarn command to intercept >",
+      choices: visibleArgs.map(([arg]) => arg),
+    });
+    await invokeCmd(selection);
+    process.stdout.write("\n\n");
+    return devPrompt();
+  } catch (err) {
+    if (err instanceof Error && err.name === "ExitPromptError") {
+      return jb.ExitWithError(`setup cancelled by user`);
+    } else {
+      return jb.ExitWithError(`failed to invoke dev prompt: ${err}`);
+    }
+  }
 }
 
-if (!yarnArg) {
-  jb.ExitWithError(
-    `no arg provided - please provide a valid arg to execute`,
-    true,
-  );
-} else {
-  await jb
-    .CheckRegistry()
-    .then(async () => {
-      await invokeCmd(yarnArg);
-    })
-    .catch((err) => jb.ExitWithError(err.message, true));
+try {
+  if (!yarnArg) {
+    throw new Error(`no arg provided - please provide a valid arg to execute`);
+  } else {
+    if (yarnArg !== "--jbdev") await jb.CheckRegistry();
+    await invokeCmd(yarnArg);
+  }
+} catch (err) {
+  jb.ExitWithError(`failed to execute command: ${err}`);
 }
