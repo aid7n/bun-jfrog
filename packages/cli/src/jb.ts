@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-declare const JB_CLI_VERSION: string;
+type Selection = "enable" | "disable" | "exit";
 
 interface InitResult {
   bunBinPath: string;
@@ -23,7 +23,12 @@ const isWindows = platform === "win32";
 let changeset: {
   oldPath: string;
   newPath: string;
+  type: "rename" | "remove" | "symlink" | "copy";
 }[] = [];
+
+function getVersion(): string {
+  return Bun.env.JB_CLI_VERSION ?? "dev";
+}
 
 async function initialize(disableLog?: boolean): Promise<InitResult | null> {
   try {
@@ -38,7 +43,7 @@ async function initialize(disableLog?: boolean): Promise<InitResult | null> {
     const yarnBkpPath = locateBin("yarn-jb-bak", true);
     if (yarnBkpPath && !disableLog) {
       stdout.write(
-        `ℹ️  detected existing yarn bin backup from this tool at ${yarnBkpPath} - you can restore yarn functionality by selecting disable from the menu\n\n`,
+        `ℹ️  detected at least 1 existing yarn bin backup from this tool at ${yarnBkpPath} - you can restore yarn functionality by selecting disable from the menu\n\n`,
       );
     }
 
@@ -89,7 +94,7 @@ function locateBin(
         .trim();
       if (!_path.includes("ObjectNotFound")) path = _path;
     } else {
-      const _path = execSync(`which ${executable}`).toString().trim();
+      const _path = execSync(`which ${executable} 2> /dev/null`).toString().trim();
       if (!_path.includes("not found")) path = _path;
     }
     if (path && !fs.existsSync(path)) return undefined;
@@ -109,7 +114,7 @@ function locateBin(
 function renameBin(oldPath: string, newPath: string): boolean {
   try {
     fs.renameSync(oldPath, newPath);
-    changeset.push({ oldPath, newPath });
+    changeset.push({ oldPath, newPath, type: "rename" });
     stdout.write(`✅ renamed ${oldPath} to ${newPath}\n`);
     return true;
   } catch (err) {
@@ -121,7 +126,7 @@ function renameBin(oldPath: string, newPath: string): boolean {
 function removeBin(path: string): boolean {
   try {
     fs.rmSync(path);
-    changeset.push({ oldPath: path, newPath: "removed" });
+    changeset.push({ oldPath: path, newPath: "removed", type: "remove" });
     stdout.write(`✅ removed ${path}\n`);
     return true;
   } catch (err) {
@@ -149,130 +154,92 @@ async function enableJB(
     }
     const renamed = renameBin(yarn, backupPath);
     if (!renamed) {
-      stdout.write(
+      throw new Error(
         `❌ failed to rename ${yarn} to ${backupPath} - cannot enable JFrog Bun compatibility\n`,
       );
-      process.exitCode = 1;
-      return;
     }
     const _init = await initialize(true);
     return enableJB(_init!, strategy, src);
   }
 
-  try {
-    if (strategy === "symlink") {
-      fs.symlinkSync(
-        init.jbYarnBinPath,
-        path.join(init.bunBinPath, isWindows ? "yarn.exe" : "yarn"),
-      );
-      stdout.write(
-        `✅ created symlink from ${init.jbYarnBinPath} to ${init.bunBinPath}\n`,
-      );
-    } else if (strategy === "copy") {
-      fs.copyFileSync(
-        init.jbYarnBinPath,
-        path.join(init.bunBinPath, isWindows ? "yarn.exe" : "yarn"),
-      );
-      stdout.write(`✅ copied ${init.jbYarnBinPath} to ${init.bunBinPath}\n`);
-    } else {
-      throw new Error(`invalid strategy: ${strategy}`);
-    }
-
-    stdout.write(`📝 summary of changes:\n`);
-    changeset.forEach(({ oldPath, newPath }) => {
-      stdout.write(`- ${oldPath} -> ${newPath}\n`);
-    });
-
-    stdout.write(`\n------------------------\n\n`);
-
-    process.exitCode = 0;
-    return;
-  } catch (err) {
-    stdout.write(`❌ failed to create ${strategy} - ${err}\n`);
-    process.exitCode = 1;
-    return;
+  const newPath = path.join(init.bunBinPath, isWindows ? "yarn.exe" : "yarn");
+  if (strategy === "symlink") {
+    fs.symlinkSync(init.jbYarnBinPath, newPath);
+    changeset.push({ oldPath: init.bunBinPath, newPath, type: "symlink" });
+    stdout.write(
+      `✅ created symlink from ${init.jbYarnBinPath} to ${newPath}\n`,
+    );
+  } else if (strategy === "copy") {
+    fs.copyFileSync(init.jbYarnBinPath, newPath);
+    changeset.push({ oldPath: init.bunBinPath, newPath, type: "copy" });
+    stdout.write(`✅ copied ${init.jbYarnBinPath} to ${newPath}\n`);
+  } else {
+    throw new Error(`invalid strategy: ${strategy}`);
   }
+  return;
 }
 
 async function disableJB(init: InitResult, src: "menu" | "arg"): Promise<void> {
   const jbYarn = locateBin("yarn");
   const yarnBkp = locateBin("yarn-jb-bak");
-  try {
-    if (!jbYarn || !yarnBkp) {
-      stdout.write(
-        `❌ cannot disable JFrog Bun compatibility - ${jbYarn ? "" : "jb-yarn not found"}${
-          jbYarn && !yarnBkp ? ", " : ""
-        }${yarnBkp ? "" : "yarn-jb-bak not found"}\n`,
-      );
-      process.exitCode = 1;
-      return;
-    }
-
-    if (jbYarn.includes(init.bunBinPath)) removeBin(jbYarn);
-    const restorePath = yarnBkp.replace("-jb-bak", "");
-    const renamed = renameBin(yarnBkp, restorePath);
-    if (!renamed) {
-      stdout.write(
-        `❌ failed to rename ${yarnBkp} to ${restorePath} - cannot disable JFrog Bun compatibility\n`,
-      );
-      process.exitCode = 1;
-      return;
-    }
-    const _yarnBkp = locateBin("yarn-jb-bak");
-    if (_yarnBkp) {
-      return disableJB(init, src);
-    }
-
-    stdout.write(`✅ restored ${yarnBkp} to ${restorePath}\n`);
-    stdout.write(`📝 summary of changes:\n`);
-    changeset.forEach(({ oldPath, newPath }) => {
-      stdout.write(`- ${oldPath} -> ${newPath}\n`);
-    });
-
-    stdout.write(`\n------------------------\n\n`);
-
-    process.exitCode = 0;
-    return;
-  } catch (err) {
-    stdout.write(`❌ failed to disable JFrog Bun compatibility - ${err}\n`);
-    process.exitCode = 1;
-    return;
+  if (!jbYarn || !yarnBkp) {
+    throw new Error(
+      `❌ cannot disable JFrog Bun compatibility - ${jbYarn ? "" : "jb-yarn not found"}${
+        jbYarn && !yarnBkp ? ", " : ""
+      }${yarnBkp ? "" : "yarn-jb-bak not found"}\n`,
+    );
   }
+
+  if (jbYarn.includes(init.bunBinPath)) removeBin(jbYarn);
+  const restorePath = yarnBkp.replace("-jb-bak", "");
+  const renamed = renameBin(yarnBkp, restorePath);
+  if (!renamed) {
+    throw new Error(
+      `❌ failed to rename ${yarnBkp} to ${restorePath} - cannot disable JFrog Bun compatibility\n`,
+    );
+  }
+  const _yarnBkp = locateBin("yarn-jb-bak");
+  if (_yarnBkp) {
+    return disableJB(init, src);
+  }
+  return;
 }
 
 async function handleSelection(
-  selection: "enable" | "disable",
+  selection: Selection,
   init: InitResult,
   src: "menu" | "arg",
 ): Promise<void> {
   switch (selection) {
     case "enable":
       if (init.canDisable) {
-        stdout.write(
-          "⚠️  cannot enable JFrog Bun compatibility - backup yarn binary found\n\n",
+        throw new Error(
+          "❌ cannot enable JFrog Bun compatibility - backup yarn binary found\n\n",
         );
-        process.exitCode = 1;
-        return;
       }
       stdout.write("Enabling JFrog Bun compatibility...\n\n");
       await enableJB(init, isWindows ? "copy" : "symlink", src);
       break;
     case "disable":
       if (!init.canDisable) {
-        stdout.write(
-          "⚠️  cannot disable JFrog Bun compatibility - no backup yarn binary found\n\n",
+        throw new Error(
+          "❌ cannot disable JFrog Bun compatibility - no backup yarn binary found\n\n",
         );
-        process.exitCode = 1;
-        return;
       }
       stdout.write("Disabling JFrog Bun compatibility...\n\n");
       await disableJB(init, src);
       break;
+    case "exit":
+      stdout.write("Exiting without making any changes...\n\n");
+      return;
     default:
-      stdout.write(`Invalid selection: ${selection}. Exiting.\n\n`);
-      process.exitCode = 1;
-      break;
+      throw new Error(`❌ Invalid selection: ${selection}. Exiting.\n\n`);
   }
+  stdout.write(`📝 summary of changes:\n`);
+  changeset.forEach(({ oldPath, newPath, type }) => {
+    stdout.write(`- ${oldPath} -> ${newPath} (${type})\n`);
+  });
+  stdout.write(`\n------------------------\n\n`);
 }
 
 async function main(init: InitResult): Promise<void> {
@@ -293,9 +260,18 @@ async function main(init: InitResult): Promise<void> {
           disabled: !init.canDisable,
           description: `This will restore default yarn functionality if installed.\nNOTE: This option is only available if you have previously enabled jb and already had a yarn executable installed on your system.\nIf you did not previously have yarn, you can manually remove the yarn link from ${init.bunBinPath}`,
         },
+        {
+          value: "exit",
+          name: "Exit",
+          description: "Exit without making any changes",
+        },
       ],
     });
     await handleSelection(selection, init, "menu");
+    if (selection === "exit") return;
+    const _init = await initialize(true);
+    if (!_init) throw new Error("failed to re-initialize after changes");
+    return main(_init!);
   } catch (err) {
     if (err instanceof Error && err.name === "ExitPromptError") {
       stdout.write(`\n❌ setup cancelled by user\n`);
@@ -306,12 +282,12 @@ async function main(init: InitResult): Promise<void> {
 }
 
 // entry point
-stdout.write(`@7x/jb@${JB_CLI_VERSION ?? "local"} (${platform}-${arch})\n\n`);
+stdout.write(`@7x/jb@${getVersion()} (${platform}-${arch})\n\n`);
 const init = await initialize();
 if (init) {
   if (!setupArg) {
     await main(init);
   } else {
-    await handleSelection(setupArg as "enable" | "disable", init, "arg");
+    await handleSelection(setupArg as Selection, init, "arg");
   }
 }

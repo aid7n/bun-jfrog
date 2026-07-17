@@ -7,7 +7,7 @@ await Bun.build({
   sourcemap: "inline",
   outdir: "./bin",
   define: {
-    JB_CLI_VERSION: JSON.stringify(packageJson.version),
+    "Bun.env.JB_CLI_VERSION": JSON.stringify(packageJson.version),
   },
 }).then(async (result) => {
   console.log(result);

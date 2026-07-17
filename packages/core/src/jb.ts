@@ -1,3 +1,4 @@
+import * as dotenv from "dotenv";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,19 +18,45 @@ export const targetMap = {
 export class JB {
   private stdout = process.stdout;
 
-  constructor() {}
+  constructor() {
+    try {
+      for (const envPath of [
+        ".env",
+        ".env.local",
+        ".env.development",
+        ".env.development.local",
+        ".env.test",
+        ".env.test.local",
+        ".env.production",
+        ".env.production.local",
+      ]) {
+        dotenv.config({
+          quiet: true,
+          processEnv: Bun.env || process.env,
+          path: path.resolve(process.cwd(), envPath),
+        });
+      }
+    } catch (err) {
+      this.Log(`failed to load environment: ${err}`, "warn");
+    }
+  }
 
   /**
    * writes a message to the logfile
    * @param message text to write to logfile
    * @returns void
    */
-  private Log(message: string): void {
+  private Log(
+    message: string,
+    type: "error" | "info" | "warn" = "info",
+    consoleLog = false,
+  ): void {
     const v = Bun.env.JB_LOGS_ENABLED || "true";
     if (v !== "true") return;
-    const prefix = `[@7x/jb] ${new Date().toISOString()} - `;
+    const prefix = `[@7x/jb-${process.platform}-${process.arch}] ${new Date().toISOString()} - `;
     const rootDir = path.resolve(Bun.env.TURBO_INVOCATION_DIR ?? process.cwd());
     const rootPkgLockPath = path.resolve(rootDir, "jfrog-bun.log");
+    if (consoleLog === true) console[type](`${prefix}${message}\n`);
     if (!fs.existsSync(rootPkgLockPath)) {
       fs.writeFileSync(rootPkgLockPath, prefix + message + "\n", { flag: "w" });
     } else {
@@ -42,11 +69,9 @@ export class JB {
    * @param message text to write to logfile (and screen if consoleLog is enabled)
    * @param consoleLog whether to log to the console or not
    */
-  public ExitWithError(message: string, consoleLog?: boolean): void {
-    const prefix = `[@7x/jb] -`;
-    if (consoleLog) console.error(`${prefix} error: ${message}\n`);
-    this.Log(`error: ${message}`);
-    process.exitCode = 1;
+  public ExitWithError(message: string): void {
+    this.Log(`error: ${message}`, "error", true);
+    process.exit(1);
   }
 
   /**
@@ -57,7 +82,6 @@ export class JB {
     const v = Bun.env.JB_SIMULATE_VERSION || "3.0.0";
     this.stdout.write(v);
     this.Log("intercepted yarn version command successfully");
-    process.exitCode = 0;
   }
 
   /**
@@ -71,12 +95,15 @@ export class JB {
       `intercepted yarn install command - forwarded to bun install with args: ${args.join(
         " ",
       )}`,
+      "info",
+      true,
     );
-    process.exitCode = 0;
+    return;
   }
 
   /**
    * intercepts `yarn config get` & `yarn config set` commands and outputs responses to satisfy jfrog CLI's checks
+   * @param typeOverride optional override for the config type (get/set) to allow for programmatic invocation
    * @returns void
    */
   public InvokeConfigCmd(typeOverride?: "get" | "set"): void {
@@ -85,17 +112,13 @@ export class JB {
     if (effectiveType === "get") {
       this.stdout.write("{}");
       this.Log(`intercepted yarn config get`);
-      process.exitCode = 0;
     } else if (effectiveType === "set") {
       // no output needed
-      this.Log(`intercepted yarn config set`);
-      process.exitCode = 0;
+      this.Log(`intercepted yarn config set`, "info", true);
     } else {
-      this.ExitWithError(
-        `unrecognized config arg type: ${effectiveType}`,
-        true,
-      );
+      throw new Error(`unrecognized config arg type: ${effectiveType}`);
     }
+    return;
   }
 
   /**
@@ -109,15 +132,13 @@ export class JB {
     const rootPkgLockPath = path.resolve(rootDir, "bun.lock");
 
     const lockFile = await parser.BunLock(rootPkgLockPath).catch((err) => {
-      this.ExitWithError(err.message, true);
+      throw new Error(
+        `unable to parse bun.lock at path: ${rootPkgLockPath} - ${err.message}`,
+      );
     });
 
     if (!lockFile) {
-      this.ExitWithError(
-        `could not detect lockfile at path: ${rootPkgLockPath}`,
-        true,
-      );
-      return;
+      throw new Error(`could not detect lockfile at path: ${rootPkgLockPath}`);
     }
 
     // consumer packages
@@ -284,7 +305,6 @@ export class JB {
     this.Log(
       `intercepted yarn info command successfully - outputted ${yarnInfo.size} lines`,
     );
-    process.exitCode = 0;
   }
 
   /**
@@ -294,7 +314,7 @@ export class JB {
   public async CheckRegistry(): Promise<void> {
     const env = Bun.env.NPM_CONFIG_REGISTRY;
     if (env && env.includes("artifactory")) {
-      this.Log(`detected JFrog Artifactory registry configured`);
+      this.Log(`detected JFrog Artifactory registry configured`, "info");
       return;
     }
 
@@ -320,29 +340,55 @@ export class JB {
       bunfig.install.registry &&
       typeof bunfig.install.registry === "string"
     ) {
-      if (bunfig.install.registry.includes("artifactory")) {
-        this.Log(`detected JFrog Artifactory registry configured`);
+      if (bunfig.install.registry.startsWith("$")) {
+        const envKey = bunfig.install.registry.slice(1);
+        const envVal = Bun.env[envKey];
+        if (envVal && envVal.includes("artifactory")) {
+          this.Log(
+            `detected JFrog Artifactory registry configured via env var`,
+            "info",
+          );
+          return;
+        } else {
+          throw new Error(
+            `bunfig install.registry is set but does not include "artifactory" and no NPM_CONFIG_REGISTRY env var set`,
+          );
+        }
+      } else if (bunfig.install.registry.includes("artifactory")) {
+        this.Log(`detected JFrog Artifactory registry configured`, "info");
         return;
       } else {
         throw new Error(
-          `bunfig install.registry is set to ${bunfig.install.registry} but does not include "artifactory" and no NPM_CONFIG_REGISTRY env var set`,
+          `bunfig install.registry is set but does not include "artifactory" and no NPM_CONFIG_REGISTRY env var set`,
         );
       }
     } else if (
       bunfig.install.registry &&
       typeof bunfig.install.registry === "object"
     ) {
-      if (bunfig.install.registry.url.includes("artifactory")) {
-        this.Log(`detected JFrog Artifactory registry configured`);
+      if (bunfig.install.registry.url.startsWith("$")) {
+        const envKey = bunfig.install.registry.url.slice(1);
+        const envVal = Bun.env[envKey];
+        if (envVal && envVal.includes("artifactory")) {
+          this.Log(
+            `detected JFrog Artifactory registry configured via env var`,
+            "info",
+          );
+          return;
+        } else {
+          throw new Error(
+            `bunfig install.registry.url is set but does not include "artifactory" and no NPM_CONFIG_REGISTRY env var set`,
+          );
+        }
+      } else if (bunfig.install.registry.url.includes("artifactory")) {
+        this.Log(`detected JFrog Artifactory registry configured`, "info");
         return;
       } else {
         throw new Error(
-          `bunfig install.registry.url is set to ${bunfig.install.registry.url} but does not include "artifactory" and no NPM_CONFIG_REGISTRY env var set`,
+          `bunfig install.registry.url is set but does not include "artifactory" and no NPM_CONFIG_REGISTRY env var set`,
         );
       }
     }
-
-    process.exitCode = 0;
     return;
   }
 }
